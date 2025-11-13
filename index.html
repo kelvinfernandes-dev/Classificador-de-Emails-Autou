@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Classificador de E-mails com IA</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            background-color: #f4f4f9;
+        }
+        .header {
+            background-color: #1a73e8;
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0;
+        }
+        .main-content {
+            display: flex;
+            max-width: 1200px;
+            margin: 20px auto;
+            gap: 20px;
+        }
+        .input-panel, .sidebar {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+        .input-panel {
+            flex: 2; /* Painel principal maior */
+        }
+        .sidebar {
+            flex: 1; /* Sidebar menor */
+            min-width: 300px;
+        }
+        textarea {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 20px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box;
+            resize: vertical;
+            min-height: 150px;
+        }
+        button {
+            background-color: #1a73e8;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #1558b3;
+        }
+        .results {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #e0e0e0;
+        }
+        .results p {
+            font-size: 16px;
+            margin: 10px 0;
+        }
+        /* Estilos de Categoria */
+        .category-produtivo { color: green; font-weight: bold; }
+        .category-improdutivo { color: #d9534f; font-weight: bold; }
+        .category-spam { color: purple; font-weight: bold; }
+        .category-error { color: orange; font-weight: bold; }
+        .loading { font-style: italic; color: #666; }
+
+        /* Estilos do Histórico */
+        #historyList {
+            list-style: none;
+            padding: 0;
+        }
+        #historyList li {
+            padding: 10px 0;
+            border-bottom: 1px dashed #eee;
+            cursor: pointer;
+        }
+        #historyList li:hover {
+            background-color: #f9f9f9;
+        }
+        .history-status-ok { color: green; }
+        .history-status-falha { color: red; }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <h1>✉️ Classificador de E-mails com IA</h1>
+    <p>Sistema inteligente para automação de suporte e gestão de caixa de entrada.</p>
+</div>
+
+<div class="main-content">
+    
+    <div class="input-panel">
+        <h2>Análise de E-mail</h2>
+        <p>Insira o conteúdo de um e-mail para classificá-lo como "Produtivo", "Improdutivo" ou "Spam".</p>
+
+        <form id="classificationForm">
+            <label for="emailContent">Conteúdo do E-mail</label>
+            <textarea id="emailContent" name="email_text" required placeholder="Ex: 'Preciso verificar o status do chamado 456...'"></textarea>
+            
+            <button type="submit" id="classifyButton">Classificar E-mail</button>
+        </form>
+
+        <div class="results">
+            <h2>Resultados da Análise</h2>
+            <p>Classificação: <span id="categoryResult" class="loading">Aguardando classificação...</span></p>
+            <p>Resposta Sugerida: <span id="responseResult" class="loading"></span></p>
+        </div>
+    </div>
+
+    <div class="sidebar">
+        <h2>⏱️ Últimas Classificações</h2>
+        <p>Histórico das 10 últimas análises.</p>
+        <ul id="historyList">
+            <li class="loading">Carregando...</li>
+        </ul>
+    </div>
+
+</div>
+
+<script>
+    const categorySpan = document.getElementById('categoryResult');
+    const responseSpan = document.getElementById('responseResult');
+    const historyList = document.getElementById('historyList');
+    const classifyButton = document.getElementById('classifyButton');
+
+    // --- Funções do Histórico ---
+
+    async function loadHistoryList() {
+        try {
+            const response = await fetch('/history');
+            const history = await response.json();
+            
+            historyList.innerHTML = ''; // Limpa a lista
+            
+            if (history.length === 0) {
+                historyList.innerHTML = '<li>Nenhuma classificação registrada ainda.</li>';
+                return;
+            }
+
+            history.forEach(item => {
+                const li = document.createElement('li');
+                const statusClass = item.status === 'OK' ? 'history-status-ok' : 'history-status-falha';
+                
+                li.innerHTML = `
+                    <span class="${statusClass}">[${item.status}]</span> 
+                    <strong>${item.classification || 'ERRO'}</strong>
+                    (${item.timestamp})
+                    <br>
+                    <small>${item.input}</small>
+                `;
+                historyList.appendChild(li);
+            });
+
+        } catch (error) {
+            historyList.innerHTML = '<li class="history-status-falha">Erro ao carregar histórico.</li>';
+        }
+    }
+
+    // --- Lógica de Classificação ---
+
+    document.getElementById('classificationForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const emailText = document.getElementById('emailContent').value;
+
+        // Estado de Carregamento
+        categorySpan.textContent = 'Analisando com IA...';
+        categorySpan.className = 'loading';
+        responseSpan.textContent = 'Processando...';
+        responseSpan.className = 'loading';
+        classifyButton.disabled = true;
+
+        const formData = new FormData();
+        formData.append('email_text', emailText);
+
+        try {
+            const response = await fetch('/classify', {
+                method: 'POST',
+                body: formData 
+            });
+
+            const data = await response.json();
+            
+            if (!response.ok) {
+                categorySpan.textContent = `ERRO (${response.status})`;
+                responseSpan.textContent = data.detail || 'Falha na comunicação com o servidor.';
+                categorySpan.className = 'category-error';
+                return;
+            }
+
+            // Sucesso
+            const classification = data.CLASSIFICACAO ? data.CLASSIFICACAO.toUpperCase() : 'ERRO';
+            
+            categorySpan.textContent = classification;
+            responseSpan.textContent = data.RESPOSTA_SUGERIDA;
+
+            if (classification === 'PRODUTIVO') {
+                 categorySpan.className = 'category-produtivo';
+            } else if (classification === 'IMPRODUTIVO') {
+                categorySpan.className = 'category-improdutivo';
+            } else if (classification === 'SPAM') {
+                categorySpan.className = 'category-spam';
+            } else {
+                categorySpan.className = 'category-error';
+            }
+            
+            // Sucesso: Atualiza o histórico após a classificação
+            await loadHistoryList();
+
+        } catch (error) {
+            console.error('Erro ao conectar ou processar:', error);
+            categorySpan.textContent = 'Erro de Conexão';
+            responseSpan.textContent = 'Não foi possível conectar ao servidor.';
+            categorySpan.className = 'category-error';
+        } finally {
+            classifyButton.disabled = false;
+        }
+    });
+
+    // Carrega o histórico ao iniciar a página
+    window.onload = loadHistoryList; 
+
+</script>
+
+</body>
+</html>

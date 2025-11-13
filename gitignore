@@ -1,0 +1,15 @@
+
+.env
+*.key
+*.pem
+
+history.json 
+# Diretório do Python
+__pycache__/
+# Arquivos de bytecode compilado
+*.pyc
+venv/
+.venv/
+.DS_Store # macOS
+*~ # Emacs/Linux
+.vscode/ # Configurações de editor (opcional, mas recomendado)
