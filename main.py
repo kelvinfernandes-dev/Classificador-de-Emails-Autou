@@ -1,13 +1,12 @@
 import os
 import json
 import datetime
-from fastapi import FastAPI, Form, HTTPException, UploadFile, File
+from fastapi import FastAPI, Form, HTTPException, UploadFile, File # NOVAS IMPORTAÇÕES
 from fastapi.responses import FileResponse
 from google import genai
 from google.genai.errors import APIError
-from typing import Union
+from typing import Union # NOVA IMPORTAÇÃO
 from io import BytesIO
-from pypdf2 import PdfReader # NOVO: Importa para processamento de PDF
 
 # --- Configurações ---
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
@@ -84,27 +83,12 @@ async def classify_email(
             raise HTTPException(status_code=400, detail=f"Extensão de arquivo não suportada: .{file_extension}. Use .txt ou .pdf.")
         
         try:
+            # Tenta ler o conteúdo como texto (funciona para .txt)
             content_bytes = await email_file.read()
-            
-            if file_extension == "txt":
-                # Processa TXT normalmente
-                email_content = content_bytes.decode("utf-8")
-            
-            elif file_extension == "pdf":
-                # Processa PDF usando PyPDF2
-                pdf_file = BytesIO(content_bytes)
-                reader = PdfReader(pdf_file)
-                pdf_text = []
-                
-                # Extrai texto página por página
-                for page in reader.pages:
-                    pdf_text.append(page.extract_text())
-                    
-                email_content = "\n".join(pdf_text)
-            
-        except Exception as e:
-             # Erro genérico de leitura de arquivo
-             raise HTTPException(status_code=400, detail=f"Erro ao ler o conteúdo do arquivo. Verifique se o arquivo não está corrompido ou protegido. Detalhe: {str(e)}")
+            email_content = content_bytes.decode("utf-8")
+        except Exception:
+             # Para PDF (que é binário) seria necessário uma biblioteca específica
+             raise HTTPException(status_code=400, detail="Erro ao ler o conteúdo do arquivo. Certifique-se de que é um texto válido (.txt). O suporte a PDF binário é limitado nesta versão.")
 
     # 2. PROCESSAMENTO DE TEXTO DIRETO
     elif email_text and email_text.strip():
