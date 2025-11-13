@@ -41,7 +41,7 @@
         textarea {
             width: 100%;
             padding: 10px;
-            margin-bottom: 20px;
+            margin-bottom: 10px;
             border: 1px solid #ccc;
             border-radius: 4px;
             box-sizing: border-box;
@@ -56,6 +56,7 @@
             border-radius: 4px;
             cursor: pointer;
             font-size: 16px;
+            margin-top: 15px;
         }
         button:hover {
             background-color: #1558b3;
@@ -84,10 +85,6 @@
         #historyList li {
             padding: 10px 0;
             border-bottom: 1px dashed #eee;
-            cursor: pointer;
-        }
-        #historyList li:hover {
-            background-color: #f9f9f9;
         }
         .history-status-ok { color: green; }
         .history-status-falha { color: red; }
@@ -96,7 +93,7 @@
 <body>
 
 <div class="header">
-    <h1>✉️ Classificador de E-mails com IA</h1>
+    <h1>Classificador de E-mails com IA</h1>
     <p>Sistema inteligente para automação de suporte e gestão de caixa de entrada.</p>
 </div>
 
@@ -106,134 +103,144 @@
         <h2>Análise de E-mail</h2>
         <p>Insira o conteúdo de um e-mail para classificá-lo como "Produtivo", "Improdutivo" ou "Spam".</p>
 
-        <form id="classificationForm">
-            <label for="emailContent">Conteúdo do E-mail</label>
-            <textarea id="emailContent" name="email_text" required placeholder="Ex: 'Preciso verificar o status do chamado 456...'"></textarea>
+        <form id="emailForm" enctype="multipart/form-data">
             
-            <button type="submit" id="classifyButton">Classificar E-mail</button>
+            <label for="emailText">Conteúdo do E-mail (Texto)</label>
+            <textarea id="emailText" name="email_text" placeholder="Cole o conteúdo do e-mail aqui..."></textarea>
+            
+            <label for="emailFile" style="display: block; margin-top: 15px;">Ou Upload de Arquivo (.txt / .pdf)</label>
+            <input type="file" id="emailFile" name="email_file" accept=".txt,.pdf" style="margin-bottom: 20px;">
+            
+            <button type="submit">Classificar E-mail</button>
         </form>
 
         <div class="results">
-            <h2>Resultados da Análise</h2>
-            <p>Classificação: <span id="categoryResult" class="loading">Aguardando classificação...</span></p>
-            <p>Resposta Sugerida: <span id="responseResult" class="loading"></span></p>
+            <h3>Resultados da Análise</h3>
+            <p>Classificação: <span id="categoryResult" class="category-error">AGUARDANDO</span></p>
+            <p>Resposta Sugerida: <span id="responseSuggested">Insira um e-mail para começar.</span></p>
         </div>
     </div>
 
     <div class="sidebar">
-        <h2>⏱️ Últimas Classificações</h2>
+        <h2>Últimas Classificações</h2>
         <p>Histórico das 10 últimas análises.</p>
         <ul id="historyList">
-            <li class="loading">Carregando...</li>
+            <li>Carregando...</li>
         </ul>
     </div>
 
 </div>
 
 <script>
-    const categorySpan = document.getElementById('categoryResult');
-    const responseSpan = document.getElementById('responseResult');
+document.addEventListener('DOMContentLoaded', () => {
+    // Inicializa o histórico
+    updateHistory(); 
+    // Adiciona o listener ao formulário
+    document.getElementById('emailForm').addEventListener('submit', classifyEmail);
+});
+
+// Função para buscar e atualizar o histórico
+async function updateHistory() {
     const historyList = document.getElementById('historyList');
-    const classifyButton = document.getElementById('classifyButton');
+    historyList.innerHTML = '<li>Atualizando...</li>';
 
-    // --- Funções do Histórico ---
+    try {
+        const response = await fetch('/history');
+        const history = await response.json();
 
-    async function loadHistoryList() {
-        try {
-            const response = await fetch('/history');
-            const history = await response.json();
-            
-            historyList.innerHTML = ''; // Limpa a lista
-            
-            if (history.length === 0) {
-                historyList.innerHTML = '<li>Nenhuma classificação registrada ainda.</li>';
-                return;
-            }
-
-            history.forEach(item => {
-                const li = document.createElement('li');
-                const statusClass = item.status === 'OK' ? 'history-status-ok' : 'history-status-falha';
-                
-                li.innerHTML = `
-                    <span class="${statusClass}">[${item.status}]</span> 
-                    <strong>${item.classification || 'ERRO'}</strong>
-                    (${item.timestamp})
-                    <br>
-                    <small>${item.input}</small>
-                `;
-                historyList.appendChild(li);
-            });
-
-        } catch (error) {
-            historyList.innerHTML = '<li class="history-status-falha">Erro ao carregar histórico.</li>';
+        historyList.innerHTML = ''; // Limpa a lista
+        if (history.length === 0) {
+            historyList.innerHTML = '<li>Nenhuma análise recente.</li>';
+            return;
         }
+
+        history.forEach(item => {
+            const li = document.createElement('li');
+            const statusClass = item.status === 'OK' ? 'history-status-ok' : 'history-status-falha';
+            
+            li.innerHTML = `
+                [<span class="${statusClass}">${item.status}</span>] 
+                <strong>${item.classification}</strong> (${item.timestamp})
+                <br>${item.input.substring(0, 50)}...
+            `;
+            historyList.appendChild(li);
+        });
+
+    } catch (error) {
+        historyList.innerHTML = '<li>Erro ao carregar histórico.</li>';
+        console.error('Erro ao buscar histórico:', error);
     }
+}
 
-    // --- Lógica de Classificação ---
 
-    document.getElementById('classificationForm').addEventListener('submit', async function(e) {
-        e.preventDefault();
-        
-        const emailText = document.getElementById('emailContent').value;
+// Função principal para classificar
+async function classifyEmail(event) {
+    event.preventDefault();
 
-        // Estado de Carregamento
-        categorySpan.textContent = 'Analisando com IA...';
-        categorySpan.className = 'loading';
-        responseSpan.textContent = 'Processando...';
-        responseSpan.className = 'loading';
-        classifyButton.disabled = true;
+    const form = document.getElementById('emailForm');
+    // Captura todos os dados do formulário, incluindo o arquivo
+    const formData = new FormData(form); 
 
-        const formData = new FormData();
-        formData.append('email_text', emailText);
+    const emailText = formData.get('email_text').trim();
+    const emailFile = formData.get('email_file');
 
-        try {
-            const response = await fetch('/classify', {
-                method: 'POST',
-                body: formData 
-            });
+    if (!emailText && !emailFile.name) {
+        alert("Insira o texto do e-mail ou faça o upload de um arquivo.");
+        return;
+    }
+    
+    // Configura UI para carregamento
+    const categorySpan = document.getElementById('categoryResult');
+    const responseSpan = document.getElementById('responseSuggested');
+    categorySpan.textContent = 'ANALISANDO...';
+    categorySpan.className = 'loading';
+    responseSpan.textContent = 'Aguarde o retorno da Inteligência Artificial...';
 
-            const data = await response.json();
-            
-            if (!response.ok) {
-                categorySpan.textContent = `ERRO (${response.status})`;
-                responseSpan.textContent = data.detail || 'Falha na comunicação com o servidor.';
-                categorySpan.className = 'category-error';
-                return;
-            }
+    try {
+        // Envia o FormData. O navegador lida com o tipo de conteúdo multipart/form-data.
+        const response = await fetch('/classify', {
+            method: 'POST',
+            body: formData 
+        });
 
-            // Sucesso
-            const classification = data.CLASSIFICACAO ? data.CLASSIFICACAO.toUpperCase() : 'ERRO';
-            
-            categorySpan.textContent = classification;
-            responseSpan.textContent = data.RESPOSTA_SUGERIDA;
+        const data = await response.json();
 
-            if (classification === 'PRODUTIVO') {
-                 categorySpan.className = 'category-produtivo';
-            } else if (classification === 'IMPRODUTIVO') {
-                categorySpan.className = 'category-improdutivo';
-            } else if (classification === 'SPAM') {
-                categorySpan.className = 'category-spam';
-            } else {
-                categorySpan.className = 'category-error';
-            }
-            
-            // Sucesso: Atualiza o histórico após a classificação
-            await loadHistoryList();
-
-        } catch (error) {
-            console.error('Erro ao conectar ou processar:', error);
-            categorySpan.textContent = 'Erro de Conexão';
-            responseSpan.textContent = 'Não foi possível conectar ao servidor.';
+        if (!response.ok) {
+            // Trata erros HTTP (4xx, 5xx)
+            categorySpan.textContent = data.CLASSIFICACAO || 'ERRO HTTP'; // Pode vir da IA
             categorySpan.className = 'category-error';
-        } finally {
-            classifyButton.disabled = false;
+            responseSpan.textContent = data.detail || data.RESPOSTA_SUGERIDA || 'Ocorreu um erro no servidor ou a IA falhou.';
+            // Não retorna, pois o updateHistory já foi chamado no backend em caso de erro da IA
+            updateHistory(); 
+            return;
         }
-    });
 
-    // Carrega o histórico ao iniciar a página
-    window.onload = loadHistoryList; 
+        // Sucesso: Aplica a lógica de cores
+        const classification = data.CLASSIFICACAO ? data.CLASSIFICACAO.toUpperCase() : 'ERRO';
+        
+        categorySpan.textContent = classification;
+        responseSpan.textContent = data.RESPOSTA_SUGERIDA;
 
+        if (classification === 'PRODUTIVO') {
+            categorySpan.className = 'category-produtivo';
+        } else if (classification === 'IMPRODUTIVO') {
+            categorySpan.className = 'category-improdutivo';
+        } else if (classification === 'SPAM') {
+            categorySpan.className = 'category-spam';
+        } else {
+            categorySpan.className = 'category-error';
+        }
+
+        // Atualiza o histórico após a classificação bem-sucedida
+        updateHistory(); 
+
+    } catch (error) {
+        console.error('Erro de rede ou parsing:', error);
+        categorySpan.textContent = 'ERRO DE REDE';
+        categorySpan.className = 'category-error';
+        responseSpan.textContent = 'Não foi possível conectar ao servidor. Verifique o console.';
+    }
+}
 </script>
-
 </body>
 </html>

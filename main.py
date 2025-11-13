@@ -1,19 +1,19 @@
-# main.py
-
 import os
 import json
 import datetime
-from fastapi import FastAPI, Form, HTTPException
+from fastapi import FastAPI, Form, HTTPException, UploadFile, File # NOVAS IMPORTAÇÕES
 from fastapi.responses import FileResponse
 from google import genai
 from google.genai.errors import APIError
+from typing import Union # NOVA IMPORTAÇÃO
+from io import BytesIO
 
 # --- Configurações ---
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 client = genai.Client(api_key=GEMINI_API_KEY)
 app = FastAPI(title="Email Classifier AutoU")
 
-HISTORY_FILE = "history.json" # Arquivo para persistência do histórico
+HISTORY_FILE = "history.json" 
 
 # --- Funções de Histórico ---
 
@@ -59,7 +59,7 @@ def save_history(entry):
 async def read_index():
     return FileResponse("index.html")
 
-# --- Rota para o Histórico (NOVA ROTA) ---
+# --- Rota para o Histórico ---
 @app.get("/history")
 async def get_history():
     """Retorna o histórico de classificações para o frontend."""
@@ -67,15 +67,41 @@ async def get_history():
 
 # --- API Route para Classificação ---
 @app.post("/classify")
-async def classify_email(email_text: str = Form(...)):
-    """
-    Recebe o texto do e-mail e usa o modelo Gemini para classificar e sugerir a resposta.
-    """
-    if not email_text.strip():
-        raise HTTPException(status_code=400, detail="O campo de e-mail não pode estar vazio.")
+async def classify_email(
+    email_text: Union[str, None] = Form(None), 
+    email_file: Union[UploadFile, None] = File(None) 
+):
     
+    email_content = ""
+    
+    # 1. PROCESSAMENTO DE ARQUIVO
+    if email_file and email_file.filename:
+        allowed_extensions = ["txt", "pdf"]
+        file_extension = email_file.filename.split('.')[-1].lower()
+        
+        if file_extension not in allowed_extensions:
+            raise HTTPException(status_code=400, detail=f"Extensão de arquivo não suportada: .{file_extension}. Use .txt ou .pdf.")
+        
+        try:
+            # Tenta ler o conteúdo como texto (funciona para .txt)
+            content_bytes = await email_file.read()
+            email_content = content_bytes.decode("utf-8")
+        except Exception:
+             # Para PDF (que é binário) seria necessário uma biblioteca específica
+             raise HTTPException(status_code=400, detail="Erro ao ler o conteúdo do arquivo. Certifique-se de que é um texto válido (.txt). O suporte a PDF binário é limitado nesta versão.")
+
+    # 2. PROCESSAMENTO DE TEXTO DIRETO
+    elif email_text and email_text.strip():
+        email_content = email_text
+        
+    else:
+        raise HTTPException(status_code=400, detail="Forneça o texto do e-mail ou faça o upload de um arquivo (.txt ou .pdf).")
+
+    if not email_content.strip():
+        raise HTTPException(status_code=400, detail="O e-mail está vazio após o processamento.")
+
     # Prepara entrada básica para histórico
-    history_entry = {"input": email_text[:50] + "...", "status": "ERRO API"}
+    history_entry = {"input": email_content[:50] + "...", "status": "ERRO API"}
 
     if not GEMINI_API_KEY:
         result = {
@@ -106,7 +132,7 @@ async def classify_email(email_text: str = Form(...)):
 
         ---
         E-mail a classificar:
-        {email_text}
+        {email_content}
         """
         
         response = client.models.generate_content(
