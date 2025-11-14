@@ -30,10 +30,11 @@ Este projeto ultrapassa os requisitos básicos do desafio (Produtivo e Improduti
 
 | Componente | Tecnologia | Função |
 | :--- | :--- | :--- |
-| **Inteligência Artificial** | **Google Gemini API** (`gemini-2.0-flash`) | Classificação e Geração de Resposta via Prompt Engineering. |
-| **Backend/API** | **FastAPI** (Python) | Servidor robusto para gerenciar requisições e a lógica de classificação. |
-| **Frontend/UX** | **HTML, CSS, JavaScript** | Interface web com cores dinâmicas para cada categoria e painel de histórico. |
-| **Containerização** | **Docker** | Empacotamento para *deploy* na nuvem. |
+| **Inteligência Artificial** | Google Gemini API (gemini-2.0-flash) | Classificação e Geração de Resposta via **Prompt Engineering**. |
+| **Backend/API** | FastAPI (Python) | Servidor robusto para gerenciar requisições e a lógica de classificação. |
+| **Frontend/UX** | HTML, CSS, JavaScript | Interface web com cores dinâmicas e painel de histórico. |
+| **Containerização** | Docker | Empacotamento para deploy na nuvem. |
+| **Hospedagem** | **Render** | Serviço de deploy e hospedagem da aplicação em produção. |
 
 ---
 
