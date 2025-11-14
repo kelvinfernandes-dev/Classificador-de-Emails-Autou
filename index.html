@@ -88,6 +88,18 @@
         }
         .history-status-ok { color: green; }
         .history-status-falha { color: red; }
+
+        /* Estilo para o botão de limpar arquivo */
+        #btn-clear-file {
+            background-color: #6c757d; /* Cinza para distinção */
+            padding: 8px 15px;
+            font-size: 14px;
+            margin-top: 0; /* Alinha verticalmente */
+            align-self: flex-end; /* Alinha com o input */
+        }
+        #btn-clear-file:hover {
+            background-color: #5a6268;
+        }
     </style>
 </head>
 <body>
@@ -108,8 +120,12 @@
             <label for="emailText">Conteúdo do E-mail (Texto)</label>
             <textarea id="emailText" name="email_text" placeholder="Cole o conteúdo do e-mail aqui..."></textarea>
             
-            <label for="emailFile" style="display: block; margin-top: 15px;">Ou Upload de Arquivo (.txt / .pdf)</label>
-            <input type="file" id="emailFile" name="email_file" accept=".txt,.pdf" style="margin-bottom: 20px;">
+            <label for="emailFile" style="display: block; margin-top: 15px;">Ou Upload de Arquivo (.txt)</label>
+            
+            <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 20px;">
+                <input type="file" id="email_file" name="email_file" accept=".txt" style="flex-grow: 1;">
+                <button type="button" id="btn-clear-file" style="display: none;">Limpar Arquivo</button>
+            </div>
             
             <button type="submit">Classificar E-mail</button>
         </form>
@@ -133,10 +149,38 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', () => {
+    // 1. Elementos principais
+    const emailForm = document.getElementById('emailForm');
+    const emailText = document.getElementById('emailText');
+    const emailFile = document.getElementById('email_file');
+    const clearButton = document.getElementById('btn-clear-file');
+    
     // Inicializa o histórico
     updateHistory(); 
-    // Adiciona o listener ao formulário
-    document.getElementById('emailForm').addEventListener('submit', classifyEmail);
+    
+    // 2. Lógica de Alternância entre Texto e Arquivo (A CORREÇÃO)
+    emailFile.addEventListener('change', () => {
+        if (emailFile.files.length > 0) {
+            clearButton.style.display = 'inline-block';
+            // Se há arquivo, desabilita o texto para forçar o backend a ler só o arquivo
+            emailText.disabled = true; 
+            emailText.value = ''; // Limpa o texto para evitar confusão visual
+        } else {
+            clearButton.style.display = 'none';
+            emailText.disabled = false;
+        }
+    });
+
+    clearButton.addEventListener('click', () => {
+        // Ação de limpeza: reseta o input, re-habilita a textarea
+        emailFile.value = ''; 
+        clearButton.style.display = 'none';
+        emailText.disabled = false;
+        emailText.focus();
+    });
+
+    // 3. Listener do Formulário
+    emailForm.addEventListener('submit', classifyEmail);
 });
 
 // Função para buscar e atualizar o histórico
@@ -178,13 +222,13 @@ async function classifyEmail(event) {
     event.preventDefault();
 
     const form = document.getElementById('emailForm');
-    // Captura todos os dados do formulário, incluindo o arquivo
     const formData = new FormData(form); 
 
-    const emailText = formData.get('email_text').trim();
-    const emailFile = formData.get('email_file');
+    const emailText = document.getElementById('emailText').value.trim();
+    const emailFile = document.getElementById('email_file').files[0];
 
-    if (!emailText && !emailFile.name) {
+    // Verifica se pelo menos uma entrada é válida
+    if (!emailText && !emailFile) {
         alert("Insira o texto do e-mail ou faça o upload de um arquivo.");
         return;
     }
@@ -197,7 +241,7 @@ async function classifyEmail(event) {
     responseSpan.textContent = 'Aguarde o retorno da Inteligência Artificial...';
 
     try {
-        // Envia o FormData. O navegador lida com o tipo de conteúdo multipart/form-data.
+        // Envia o FormData
         const response = await fetch('/classify', {
             method: 'POST',
             body: formData 
@@ -207,10 +251,9 @@ async function classifyEmail(event) {
 
         if (!response.ok) {
             // Trata erros HTTP (4xx, 5xx)
-            categorySpan.textContent = data.CLASSIFICACAO || 'ERRO HTTP'; // Pode vir da IA
+            categorySpan.textContent = data.CLASSIFICACAO || 'ERRO HTTP'; 
             categorySpan.className = 'category-error';
             responseSpan.textContent = data.detail || data.RESPOSTA_SUGERIDA || 'Ocorreu um erro no servidor ou a IA falhou.';
-            // Não retorna, pois o updateHistory já foi chamado no backend em caso de erro da IA
             updateHistory(); 
             return;
         }
