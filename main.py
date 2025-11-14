@@ -1,11 +1,11 @@
 import os
 import json
 import datetime
-from fastapi import FastAPI, Form, HTTPException, UploadFile, File # NOVAS IMPORTAÇÕES
+from fastapi import FastAPI, Form, HTTPException, UploadFile, File
 from fastapi.responses import FileResponse
 from google import genai
 from google.genai.errors import APIError
-from typing import Union # NOVA IMPORTAÇÃO
+from typing import Union
 from io import BytesIO
 
 # --- Configurações ---
@@ -86,8 +86,13 @@ async def classify_email(
             # Tenta ler o conteúdo como texto (funciona para .txt)
             content_bytes = await email_file.read()
             email_content = content_bytes.decode("utf-8")
+            
+            # CORREÇÃO CRÍTICA: Fechamento explícito do stream para liberar recursos.
+            # Se o FastAPI ou o uvicorn estiverem mantendo o stream aberto, isso pode 
+            # interferir em requisições subsequentes à API externa.
+            await email_file.close() 
+
         except Exception:
-             # Para PDF (que é binário) seria necessário uma biblioteca específica
              raise HTTPException(status_code=400, detail="Erro ao ler o conteúdo do arquivo. Certifique-se de que é um texto válido (.txt). O suporte a PDF binário é limitado nesta versão.")
 
     # 2. PROCESSAMENTO DE TEXTO DIRETO
@@ -119,9 +124,9 @@ async def classify_email(
         Você é um assistente de IA sênior de uma empresa financeira.
         Sua tarefa é analisar o e-mail fornecido e executar duas ações:
         1. CLASSIFICAR: O e-mail em uma das três categorias EXATAS: 
-           - 'Produtivo' (requer uma ação, suporte ou solução).
-           - 'Improdutivo' (mensagem social, agradecimento, felicitação).
-           - 'Spam' (e-mails não solicitados, phishing, promoções genéricas, conteúdo suspeito ou fraudulento).
+            - 'Produtivo' (requer uma ação, suporte ou solução).
+            - 'Improdutivo' (mensagem social, agradecimento, felicitação).
+            - 'Spam' (e-mails não solicitados, phishing, promoções genéricas, conteúdo suspeito ou fraudulento).
         2. GERAR RESPOSTA: Gerar uma RESPOSTA_SUGERIDA curta (máximo 4 frases). Se a classificação for 'Spam', a resposta sugerida deve ser EXATAMENTE: 'Mover para lixeira e bloquear remetente.'
 
         Sua resposta DEVE ser um objeto JSON válido, sem texto extra, no formato EXATO:
