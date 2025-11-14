@@ -4,6 +4,12 @@ Este projeto é uma Solução Digital desenvolvida para o desafio da AutoU, visa
 
 A solução utiliza Inteligência Artificial (Google Gemini) para classificar o teor de um e-mail e gerar respostas sugeridas em tempo real.
 
+## Como Acessar a Aplicação Publicamente (Deploy)
+
+A aplicação está em **produção** e hospedada no **Render**.
+
+* **Link da Aplicação:** https://classificador-de-emails-autou.onrender.com
+
 ## Destaques e Funcionalidades Adicionais
 
 Este projeto ultrapassa os requisitos básicos do desafio (Produtivo e Improdutivo) com as seguintes implementações:
